@@ -19,6 +19,6 @@ Testing Apache Kafka using Go.
 3. Play around with the `producer.go` and `consumer.go` sample applications:
 
     ```bash
-    go run producer.go
-    go run consumer.go
+    go run producer/producer.go -t topic
+    go run consumer/consumer.go -t topic -g group
     ```

@@ -3,20 +3,22 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"log"
+	"os"
 	"time"
 )
 
-var Topic = "hello"
-
-type ProducerRecordValue struct {
+type RecordValue struct {
 	Count int `json:"count"`
 }
 
 func main() {
 	fmt.Printf("Go Kafka Producer\n\n")
+
+	args := parseArgs()
 
 	producer, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
@@ -27,7 +29,7 @@ func main() {
 		log.Fatalf("Failed to create producer: %s\n", err)
 	}
 
-	CreateTopic(producer, Topic)
+	createTopic(producer, *args["topic"])
 
 	// Handle delivery reports
 	go func() {
@@ -47,7 +49,7 @@ func main() {
 	}()
 
 	for n := 0; n < 10; n++ {
-		payload := ProducerRecordValue{Count: n}
+		payload := RecordValue{Count: n}
 
 		key := "even"
 		if n%2 != 0 {
@@ -59,7 +61,7 @@ func main() {
 		fmt.Printf("Preparing to produce record: %s\t%s\n", key, value)
 
 		_ = producer.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &Topic, Partition: kafka.PartitionAny},
+			TopicPartition: kafka.TopicPartition{Topic: args["topic"], Partition: kafka.PartitionAny},
 			Key:            []byte(key),
 			Value:          value,
 		}, nil)
@@ -67,12 +69,12 @@ func main() {
 
 	producer.Flush(15 * 1000)
 
-	fmt.Printf("10 messages were produced to topic %s!\n", Topic)
+	fmt.Printf("10 messages were produced to topic %s!\n", *args["topic"])
 }
 
-// CreateTopic creates a Kafka topic.
+// createTopic creates a Kafka topic.
 // If the topic already exists, this function exits gracefully.
-func CreateTopic(producer *kafka.Producer, topic string) {
+func createTopic(producer *kafka.Producer, topic string) {
 	adminClient, err := kafka.NewAdminClientFromProducer(producer)
 	defer adminClient.Close()
 
@@ -109,5 +111,21 @@ func CreateTopic(producer *kafka.Producer, topic string) {
 		}
 
 		fmt.Printf("%v\n", result)
+	}
+}
+
+func parseArgs() map[string]*string {
+	topic := flag.String("t", "", "Topic name")
+
+	flag.Parse()
+
+	if *topic == "" {
+		flag.Usage()
+
+		os.Exit(2)
+	}
+
+	return map[string]*string{
+		"topic": topic,
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"log"
@@ -11,18 +12,18 @@ import (
 	"time"
 )
 
-var topic = "hello"
-
-type ConsumerRecordValue struct {
+type RecordValue struct {
 	Count int `json:"count"`
 }
 
 func main() {
 	fmt.Printf("Go Kafka Consumer\n\n")
 
+	args := parseArgs()
+
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
-		"group.id":          "1_apache_kafka_consumer",
+		"group.id":          *args["consumerGroup"],
 		"auto.offset.reset": "earliest",
 	})
 	defer func(consumer *kafka.Consumer) {
@@ -37,7 +38,7 @@ func main() {
 		log.Fatalf("Failed to create consumer: %s", err)
 	}
 
-	err = consumer.SubscribeTopics([]string{topic}, nil)
+	err = consumer.SubscribeTopics([]string{*args["topic"]}, nil)
 
 	// Handle SIGINT (Ctrl-C)
 	sigChan := make(chan os.Signal, 1)
@@ -62,7 +63,7 @@ func main() {
 			key := string(message.Key)
 			value := message.Value
 
-			payload := ConsumerRecordValue{}
+			payload := RecordValue{}
 			err = json.Unmarshal(value, &payload)
 
 			if err != nil {
@@ -80,4 +81,22 @@ func main() {
 	}
 
 	fmt.Printf("Closing consumer...")
+}
+
+func parseArgs() map[string]*string {
+	topic := flag.String("t", "", "Topic name")
+	consumerGroup := flag.String("g", "", "Consumer group identifier")
+
+	flag.Parse()
+
+	if *topic == "" || *consumerGroup == "" {
+		flag.Usage()
+
+		os.Exit(2)
+	}
+
+	return map[string]*string{
+		"topic":         topic,
+		"consumerGroup": consumerGroup,
+	}
 }
